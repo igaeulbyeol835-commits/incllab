@@ -91,15 +91,28 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# 2. 데이터 및 기록 경로 설정 (product.csv로 변경 반영)
+# 2. 데이터 및 기록 경로 설정
 # ---------------------------------------------------------
 DATA_DIR = "."
-DATA_FILENAME = "product.csv"
+DATA_FILENAME = "products.csv"
 DATA_PATH = os.path.join(DATA_DIR, DATA_FILENAME)
 DATA_ENCODING = "utf-8"
 
 RECORD_DIR = "내_기록"
 RECORD_FILE = os.path.join(RECORD_DIR, "데이터_소개_기록.json")
+
+# 자동으로 제공할 기본 우리말 뜻 사전 (자동 번역 및 매핑)
+DEFAULT_COLUMN_MEANINGS = {
+    "product_id": "제품 고유 ID",
+    "brand_id": "브랜드 고유 ID",
+    "barcode_ean": "상품 바코드 번호 (EAN)",
+    "name": "화장품 제품명",
+    "obf_categories_tags": "제품 카테고리 태그 (분류용)",
+    "raw_ingredient_text": "전성분 원문 텍스트",
+    "created_at": "데이터 생성 일시",
+}
+
+DEFAULT_DATA_SOURCE = "INCIDB (Skincare and Cosmetics INCI Formulations) - 자동 번역 및 연동 데이터셋"
 
 
 def load_saved_notes():
@@ -108,7 +121,10 @@ def load_saved_notes():
         os.makedirs(RECORD_DIR, exist_ok=True)
 
     if not os.path.exists(RECORD_FILE):
-        default_data = {"column_meanings": {}, "data_source": ""}
+        default_data = {
+            "column_meanings": DEFAULT_COLUMN_MEANINGS,
+            "data_source": DEFAULT_DATA_SOURCE,
+        }
         with open(RECORD_FILE, "w", encoding="utf-8") as f:
             json.dump(default_data, f, ensure_ascii=False, indent=2)
         return default_data
@@ -116,13 +132,16 @@ def load_saved_notes():
     try:
         with open(RECORD_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            if "column_meanings" not in data:
-                data["column_meanings"] = {}
-            if "data_source" not in data:
-                data["data_source"] = ""
+            if not data.get("column_meanings"):
+                data["column_meanings"] = DEFAULT_COLUMN_MEANINGS
+            if not data.get("data_source"):
+                data["data_source"] = DEFAULT_DATA_SOURCE
             return data
     except Exception:
-        return {"column_meanings": {}, "data_source": ""}
+        return {
+            "column_meanings": DEFAULT_COLUMN_MEANINGS,
+            "data_source": DEFAULT_DATA_SOURCE,
+        }
 
 
 def save_notes(column_meanings: dict, data_source: str):
@@ -205,146 +224,5 @@ st.markdown(
 total_products = len(df)
 total_columns = len(df.columns)
 
-# 성분/제품 관련 유효 데이터 수 (예: 전성분이 입력된 제품 수)
 if "raw_ingredient_text" in df.columns:
-    valid_ingredient_count = int(df["raw_ingredient_text"].notna().sum())
-    ingredient_desc = "전성분 정보 보유 제품 수"
-else:
-    valid_ingredient_count = int(df.dropna().shape[0])
-    ingredient_desc = "결측치 없는 완전한 제품 수"
-
-ingredient_ratio = (
-    (valid_ingredient_count / total_products * 100) if total_products > 0 else 0.0
-)
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">전체 제품 수</div>
-            <div class="metric-value">{total_products:,}개</div>
-            <div class="metric-sub">파일: {os.path.basename(loaded_path)}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col2:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">전체 열 개수</div>
-            <div class="metric-value">{total_columns}개</div>
-            <div class="metric-sub">인코딩: {DATA_ENCODING.upper()}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col3:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">분석 주요 데이터 수</div>
-            <div class="metric-value">{valid_ingredient_count:,}개</div>
-            <div class="metric-sub">{ingredient_desc}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col4:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">주요 데이터의 비율</div>
-            <div class="metric-value">{ingredient_ratio:.1f}%</div>
-            <div class="metric-sub">전체 대비 유효 성분 비율</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# ---------------------------------------------------------
-# 열 정보 표 (우리말 뜻 직접 입력 및 JSON 자동 저장)
-# ---------------------------------------------------------
-st.markdown(
-    '<div class="section-header">2. 데이터 열(Column) 구조 및 우리말 뜻 정리</div>',
-    unsafe_allow_html=True,
-)
-st.caption("교재를 참고하여 '우리말 뜻' 칸을 직접 입력해 보세요. 입력 내용은 내_기록 폴더에 자동 저장됩니다.")
-
-saved_notes = load_saved_notes()
-saved_meanings = saved_notes.get("column_meanings", {})
-saved_source = saved_notes.get("data_source", "")
-
-col_info_rows = []
-for col_name in df.columns:
-    col_info_rows.append(
-        {
-            "열 이름": col_name,
-            "우리말 뜻": saved_meanings.get(col_name, ""),
-            "값의 종류": get_friendly_dtype(df[col_name]),
-            "빈 값 개수": int(df[col_name].isna().sum()),
-        }
-    )
-
-col_info_df = pd.DataFrame(col_info_rows)
-
-edited_col_df = st.data_editor(
-    col_info_df,
-    use_container_width=True,
-    hide_index=True,
-    disabled=["열 이름", "값의 종류", "빈 값 개수"],
-    column_config={
-        "열 이름": st.column_config.TextColumn("열 이름", width="medium"),
-        "우리말 뜻": st.column_config.TextColumn(
-            "우리말 뜻 (교재를 보고 직접 입력)",
-            help="이곳을 더블클릭하여 교재에 나오는 우리말 뜻을 입력하세요.",
-            width="large",
-        ),
-        "값의 종류": st.column_config.TextColumn("값의 종류", width="small"),
-        "빈 값 개수": st.column_config.NumberColumn("빈 값 개수", format="%d개", width="small"),
-    },
-    key="column_info_editor",
-)
-
-# 편집된 우리말 뜻 추출
-updated_meanings = {
-    row["열 이름"]: (row["우리말 뜻"] if pd.notna(row["우리말 뜻"]) else "")
-    for _, row in edited_col_df.iterrows()
-}
-
-# ---------------------------------------------------------
-# 데이터 처음 5줄 원본 미리보기
-# ---------------------------------------------------------
-st.markdown(
-    '<div class="section-header">3. 원본 데이터 미리보기 (처음 5줄)</div>',
-    unsafe_allow_html=True,
-)
-st.dataframe(df.head(5), use_container_width=True)
-
-# ---------------------------------------------------------
-# 맨 아래: 데이터 출처 입력 및 자동 저장
-# ---------------------------------------------------------
-st.markdown(
-    '<div class="section-header">4. 데이터 출처 기록</div>',
-    unsafe_allow_html=True,
-)
-
-updated_source = st.text_area(
-    "데이터 출처 (교재를 보고 직접 입력해 주세요)",
-    value=saved_source,
-    placeholder="",
-    height=90,
-    key="data_source_input",
-)
-
-# 변경 사항이 감지되면 '내_기록' 폴더 내 JSON 파일에 자동 업데이트
-if updated_meanings != saved_meanings or updated_source != saved_source:
-    save_notes(updated_meanings, updated_source)
-    st.toast("입력한 내용이 '내_기록' 폴더의 JSON 파일에 자동 저장되었습니다.", icon="💾")
-
-st.caption(f"📁 자동 저장 위치: `{RECORD_FILE}`")
+    valid_ingredient_count = int(df
