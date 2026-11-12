@@ -225,4 +225,149 @@ total_products = len(df)
 total_columns = len(df.columns)
 
 if "raw_ingredient_text" in df.columns:
-    valid_ingredient_count = int(df
+    valid_ingredient_count = int(df["raw_ingredient_text"].notna().sum())
+    ingredient_desc = "전성분 정보 보유 제품 수"
+else:
+    valid_ingredient_count = int(df.dropna().shape[0])
+    ingredient_desc = "결측치 없는 완전한 제품 수"
+
+ingredient_ratio = (
+    (valid_ingredient_count / total_products * 100) if total_products > 0 else 0.0
+)
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">전체 제품 수</div>
+            <div class="metric-value">{total_products:,}개</div>
+            <div class="metric-sub">파일: {os.path.basename(loaded_path)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col2:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">전체 열 개수</div>
+            <div class="metric-value">{total_columns}개</div>
+            <div class="metric-sub">인코딩: {DATA_ENCODING.upper()}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col3:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">분석 주요 데이터 수</div>
+            <div class="metric-value">{valid_ingredient_count:,}개</div>
+            <div class="metric-sub">{ingredient_desc}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col4:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">주요 데이터의 비율</div>
+            <div class="metric-value">{ingredient_ratio:.1f}%</div>
+            <div class="metric-sub">전체 대비 유효 성분 비율</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# ---------------------------------------------------------
+# 열 정보 표 (자동 번역된 우리말 뜻 표시 및 수정 가능)
+# ---------------------------------------------------------
+st.markdown(
+    '<div class="section-header">2. 데이터 열(Column) 구조 및 우리말 뜻 정리</div>',
+    unsafe_allow_html=True,
+)
+st.caption("열의 우리말 뜻이 자동으로 번역되어 제공됩니다. 필요시 직접 수정할 수 있으며, 변경 사항은 자동 저장됩니다.")
+
+saved_notes = load_saved_notes()
+saved_meanings = saved_notes.get("column_meanings", {})
+saved_source = saved_notes.get("data_source", "")
+
+col_info_rows = []
+for col_name in df.columns:
+    default_meaning = DEFAULT_COLUMN_MEANINGS.get(col_name, "")
+    current_meaning = saved_meanings.get(col_name, "")
+    if not current_meaning:
+        current_meaning = default_meaning
+
+    col_info_rows.append(
+        {
+            "열 이름": col_name,
+            "우리말 뜻": current_meaning,
+            "값의 종류": get_friendly_dtype(df[col_name]),
+            "빈 값 개수": int(df[col_name].isna().sum()),
+        }
+    )
+
+col_info_df = pd.DataFrame(col_info_rows)
+
+edited_col_df = st.data_editor(
+    col_info_df,
+    use_container_width=True,
+    hide_index=True,
+    disabled=["열 이름", "값의 종류", "빈 값 개수"],
+    column_config={
+        "열 이름": st.column_config.TextColumn("열 이름", width="medium"),
+        "우리말 뜻": st.column_config.TextColumn(
+            "우리말 뜻 (자동 번역 및 편집 가능)",
+            help="자동 번역된 내용을 확인하거나 직접 수정할 수 있습니다.",
+            width="large",
+        ),
+        "값의 종류": st.column_config.TextColumn("값의 종류", width="small"),
+        "빈 값 개수": st.column_config.NumberColumn("빈 값 개수", format="%d개", width="small"),
+    },
+    key="column_info_editor",
+)
+
+# 편집된 우리말 뜻 추출
+updated_meanings = {
+    row["열 이름"]: (row["우리말 뜻"] if pd.notna(row["우리말 뜻"]) else "")
+    for _, row in edited_col_df.iterrows()
+}
+
+# ---------------------------------------------------------
+# 데이터 처음 5줄 원본 미리보기
+# ---------------------------------------------------------
+st.markdown(
+    '<div class="section-header">3. 원본 데이터 미리보기 (처음 5줄)</div>',
+    unsafe_allow_html=True,
+)
+st.dataframe(df.head(5), use_container_width=True)
+
+# ---------------------------------------------------------
+# 맨 아래: 데이터 출처 기록
+# ---------------------------------------------------------
+st.markdown(
+    '<div class="section-header">4. 데이터 출처 기록</div>',
+    unsafe_allow_html=True,
+)
+
+updated_source = st.text_area(
+    "데이터 출처",
+    value=saved_source,
+    placeholder="데이터 출처를 입력하세요.",
+    height=90,
+    key="data_source_input",
+)
+
+# 변경 사항이 감지되면 '내_기록' 폴더 내 JSON 파일에 자동 업데이트
+if updated_meanings != saved_meanings or updated_source != saved_source:
+    save_notes(updated_meanings, updated_source)
+    st.toast("변경 내용이 '내_기록' 폴더의 JSON 파일에 자동 저장되었습니다.", icon="💾")
+
+st.caption(f"📁 자동 저장 위치: `{RECORD_FILE}`")
