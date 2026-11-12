@@ -91,7 +91,7 @@ st.markdown(
 )
 
 # ---------------------------------------------------------
-# 2. 데이터 및 기록 경로 설정
+# 2. 데이터 및 기록 경로 설정 (product.csv 반영)
 # ---------------------------------------------------------
 DATA_DIR = "."
 DATA_FILENAME = "product.csv"
@@ -141,7 +141,6 @@ def save_notes(column_meanings: dict, data_source: str):
 @st.cache_data
 def load_dataset(filepath: str, encoding: str):
     """실제 CSV 파일을 파이프(|) 구분자로 불러옵니다."""
-    # products_2.csv가 없을 경우 대비해 products.csv도 대체 허용
     target_path = filepath
     if not os.path.exists(target_path) and os.path.exists("products.csv"):
         target_path = "products.csv"
@@ -287,7 +286,6 @@ saved_source = saved_notes.get("data_source", "")
 
 col_info_rows = []
 for col_name in df.columns:
-    # 코드가 임의로 뜻을 채우지 않고, 저장된 기록이 없으면 빈 문자열("")로 둠
     col_info_rows.append(
         {
             "열 이름": col_name,
