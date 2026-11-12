@@ -94,7 +94,7 @@ st.markdown(
 # 2. 데이터 및 기록 경로 설정
 # ---------------------------------------------------------
 DATA_DIR = "."
-DATA_FILENAME = "products_2.csv"
+DATA_FILENAME = "products.csv"
 DATA_PATH = os.path.join(DATA_DIR, DATA_FILENAME)
 DATA_ENCODING = "utf-8"
 
